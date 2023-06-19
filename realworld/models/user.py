@@ -1,7 +1,7 @@
 import datetime as dt
 import uuid
 
-from sqlalchemy import Column, DateTime, String, Uuid
+from sqlalchemy import Column, DateTime, String, Uuid, func
 
 from realworld.db.base_class import Base
 
@@ -16,5 +16,5 @@ class User(Base):
     bio = Column(String, nullable=False, default="")
     image = Column(String, nullable=True)
     password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=dt.datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=dt.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
