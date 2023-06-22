@@ -29,7 +29,7 @@ async def create_user(
     user = await service.create(db, user_in=body.user)
     if user is None:
         raise HTTPException(
-            HTTPStatus.INTERNAL_SERVER_ERROR, detail="could not create user"
+            HTTPStatus.INTERNAL_SERVER_ERROR, detail={"user": ["could not be created"]}
         )
 
     authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
@@ -77,7 +77,7 @@ async def update_user(
 
     user = await service.update(db, user=authenticated_user, user_in=body.user)
     if user is None:
-        raise HTTPException(HTTPStatus.NOT_FOUND, detail="user not found")
+        raise HTTPException(HTTPStatus.NOT_FOUND, detail={"user": ["not found"]})
 
     authenticated_user = AuthUser(
         **User.from_orm(user).dict(),
