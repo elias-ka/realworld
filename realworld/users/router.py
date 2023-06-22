@@ -51,7 +51,7 @@ async def create_user(
     status_code=HTTPStatus.OK,
     response_model=UserBody[AuthUser],
 )
-async def user_login(db: DbSession, body: UserBody[LoginUser]) -> UserBody[AuthUser]:
+async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[AuthUser]:
     user = await service.get_by_field(db, field="email", value=body.user.email)
 
     if user is None or not user.password_matches(body.user.password):
