@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from realworld.database.core import DbSession
 from realworld.users import service
-from realworld.users.dependencies import get_current_user, unique_user
+from realworld.users.dependencies import get_current_user
 
 from .schema import (
     AuthUser,
@@ -24,12 +24,22 @@ router = APIRouter()
     response_model=UserBody[AuthUser],
 )
 async def create_user(
-    db: DbSession, body: UserBody[NewUser] = Depends(unique_user)
+    db: DbSession,
+    body: UserBody[NewUser],
 ) -> UserBody[AuthUser]:
+    if not await service.is_unique(
+        db, email=body.user.email, username=body.user.username
+    ):
+        raise HTTPException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail={"user": ["user with this email or username already exists"]},
+        )
+
     user = await service.create(db, user_in=body.user)
     if user is None:
         raise HTTPException(
-            HTTPStatus.INTERNAL_SERVER_ERROR, detail={"user": ["could not be created"]}
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail={"user": ["could not be created"]},
         )
 
     authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
@@ -68,20 +78,45 @@ async def current_user(
 )
 async def update_user(
     db: DbSession,
-    body: UserBody[UpdateUser] = Depends(unique_user),
+    body: UserBody[UpdateUser],
     authenticated_user: AuthUser = Depends(get_current_user),
 ) -> UserBody[AuthUser]:
     # All fields being None essentially means these routes are the same
     if all(val is None for val in body.user.dict().values()):
         return await current_user()
 
+    if body.user.email is not None and body.user.email != authenticated_user.email:
+        if (
+            await service.get_by_field(db, field="email", value=body.user.email)
+            is not None
+        ):
+            raise HTTPException(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                detail={"email": ["user with this email already exists"]},
+            )
+
+    if (
+        body.user.username is not None
+        and body.user.username != authenticated_user.username
+    ):
+        if (
+            await service.get_by_field(
+                db, field="username", value=authenticated_user.username
+            )
+            is not None
+        ):
+            raise HTTPException(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                detail={"username": ["user with this username already exists"]},
+            )
+
     user = await service.update(db, user=authenticated_user, user_in=body.user)
     if user is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail={"user": ["not found"]})
 
-    authenticated_user = AuthUser(
-        **User.from_orm(user).dict(),
-        token=user.gen_jwt(),
+    return UserBody(
+        user=AuthUser(
+            **User.from_orm(user).dict(),
+            token=user.gen_jwt(),
+        )
     )
-
-    return UserBody(user=authenticated_user)

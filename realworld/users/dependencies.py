@@ -6,19 +6,9 @@ from fastapi import Header, HTTPException
 
 from realworld.config import JWT_ALG, JWT_SECRET
 from realworld.database.core import DbSession
-from realworld.users.service import get, is_unique
+from realworld.users.service import get
 
-from .schema import AuthUser, NewUser, User, UserBody
-
-
-async def unique_user(db: DbSession, body: UserBody[NewUser]) -> UserBody[NewUser]:
-    if not await is_unique(db, email=body.user.email, username=body.user.username):
-        raise HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail={"user": ["user with this email or username already exists"]},
-        )
-
-    return body
+from .schema import AuthUser, User
 
 
 async def get_current_user(db: DbSession, authorization: str = Header(...)) -> AuthUser:

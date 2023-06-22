@@ -48,7 +48,7 @@ async def update(
     results = await db.execute(
         sa.update(RealWorldUser)
         .where(RealWorldUser.id == user.id)
-        .values(password_hash=user_in.password, **user_in.dict(exclude={"password"}))
+        .values(**user_in.dict(exclude_none=True))
         .returning(RealWorldUser)
     )
     await db.commit()
