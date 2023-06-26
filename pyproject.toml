@@ -31,6 +31,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
+extend-exclude = ["migrations/versions"]
 ignore = [
     "B008",   # function-call-in-default-argument, required for FastAPI dependency injection
     "ANN101", # missing-type-self, the type of self is usually inferred by type checkers
