@@ -18,6 +18,7 @@ from .schema import (
 router = APIRouter()
 
 
+# https://realworld-docs.netlify.app/docs/specs/backend-specs/endpoints#registration
 @router.post(
     "/users",
     status_code=HTTPStatus.CREATED,
@@ -42,10 +43,13 @@ async def create_user(
             detail={"user": ["could not be created"]},
         )
 
-    authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
+    authenticated_user = AuthUser(
+        **User.from_orm(user).dict(), token=await user.gen_jwt()
+    )
     return UserBody(user=authenticated_user)
 
 
+# https://realworld-docs.netlify.app/docs/specs/backend-specs/endpoints#authentication
 @router.post(
     "/users/login",
     status_code=HTTPStatus.OK,
@@ -60,10 +64,13 @@ async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[Auth
             detail={"user": ["invalid email or password"]},
         )
 
-    authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
+    authenticated_user = AuthUser(
+        **User.from_orm(user).dict(), token=await user.gen_jwt()
+    )
     return UserBody(user=authenticated_user)
 
 
+# https://realworld-docs.netlify.app/docs/specs/backend-specs/endpoints#get-current-user
 @router.get("/user", status_code=HTTPStatus.OK, response_model=UserBody[AuthUser])
 async def current_user(
     current_user: AuthUser = Depends(get_current_user),
@@ -71,6 +78,7 @@ async def current_user(
     return UserBody(user=current_user)
 
 
+# https://realworld-docs.netlify.app/docs/specs/backend-specs/endpoints#update-user
 @router.put(
     "/user",
     status_code=HTTPStatus.OK,
@@ -117,6 +125,6 @@ async def update_user(
     return UserBody(
         user=AuthUser(
             **User.from_orm(user).dict(),
-            token=user.gen_jwt(),
+            token=await user.gen_jwt(),
         )
     )

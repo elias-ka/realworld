@@ -13,6 +13,7 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
+# https://realworld-docs.netlify.app/docs/specs/backend-specs/api-response-format/#users-for-authentication
 class UserBody(GenericModel, Generic[T]):
     user: T
 
