@@ -31,6 +31,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
+line-length = 120
 extend-exclude = ["migrations/versions"]
 ignore = [
     "B008",   # function-call-in-default-argument, required for FastAPI dependency injection
@@ -55,3 +56,6 @@ extend-select = [
     "TID", # flake8-tidy-imports
     "RUF", # ruff-specific
 ]
+
+[tool.black]
+line-length = 120

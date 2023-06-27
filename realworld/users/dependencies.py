@@ -1,39 +1,52 @@
-import uuid
 from http import HTTPStatus
+from typing import Annotated
 
-import jwt
 from fastapi import Header, HTTPException
 
-from realworld.config import JWT_ALG, JWT_SECRET
 from realworld.database.core import DbSession
-from realworld.users.service import get
+from realworld.users.jwt_claims import JwtClaims
+from realworld.users.service import get_user
 
 from .schema import AuthUser, User
 
+authorization_exception = HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="could not validate credentials")
+missing_authorization_exception = HTTPException(
+    status_code=HTTPStatus.UNAUTHORIZED, detail="missing authorization header"
+)
 
-async def get_current_user(db: DbSession, authorization: str = Header(...)) -> AuthUser:
-    authorization_exception = HTTPException(
-        status_code=HTTPStatus.UNAUTHORIZED, detail="could not validate credentials"
-    )
+
+async def get_current_user(db: DbSession, authorization: str = Header()) -> AuthUser:
+    token_name, token = authorization.split()
+    if token_name.lower() != "token":
+        raise authorization_exception
+
     try:
-        token_name, token = authorization.split(" ")
-        if token_name.lower() != "token":
+        claims = JwtClaims.from_token(token)
+        if not (user := await get_user(db, id=claims.user_id)):
             raise authorization_exception
 
-        payload = jwt.decode(
-            token,
-            JWT_SECRET.get_secret_value(),
-            algorithms=[JWT_ALG],
-        )
-
-        user_id = uuid.UUID(payload.get("sub"))
-        if not user_id:
-            raise authorization_exception
-
-        if not (user := await get(db, id=user_id)):
-            raise authorization_exception
-
-        return AuthUser(**User.from_orm(user).dict(), token=token, id=user_id)
+        return AuthUser(**User.from_orm(user).dict(), token=token, id=claims.user_id)
 
     except Exception:
         raise authorization_exception
+
+
+async def maybe_get_current_user(
+    db: DbSession, authorization: Annotated[str | None, Header()] = None
+) -> AuthUser | None:
+    if not authorization:
+        return None
+
+    token_name, token = authorization.split()
+    if token_name.lower() != "token":
+        return None
+
+    try:
+        claims = JwtClaims.from_token(token)
+        if not (user := await get_user(db, id=claims.user_id)):
+            return None
+
+        return AuthUser(**User.from_orm(user).dict(), token=token, id=claims.user_id)
+
+    except Exception:
+        return None

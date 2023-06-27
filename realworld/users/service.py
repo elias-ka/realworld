@@ -22,27 +22,19 @@ async def get_user(db: DbSession, *, id: uuid.UUID) -> RealWorldUser | None:
     return await db.get(RealWorldUser, id)
 
 
-async def get_user_by_field(
-    db: DbSession, *, field: str, value: str
-) -> RealWorldUser | None:
-    results = await db.execute(
-        sa.select(RealWorldUser).where(getattr(RealWorldUser, field) == value)
-    )
+async def get_user_by_field(db: DbSession, *, field: str, value: str) -> RealWorldUser | None:
+    results = await db.execute(sa.select(RealWorldUser).where(getattr(RealWorldUser, field) == value))
     return results.scalars().first()
 
 
 async def is_user_unique(db: DbSession, *, email: str, username: str) -> bool:
     results = await db.execute(
-        sa.select(RealWorldUser).where(
-            (RealWorldUser.email == email) | (RealWorldUser.username == username)
-        )
+        sa.select(RealWorldUser).where((RealWorldUser.email == email) | (RealWorldUser.username == username))
     )
     return not results.scalars().first()
 
 
-async def update_user(
-    db: DbSession, *, user: AuthUser, user_in: UpdateUser
-) -> RealWorldUser | None:
+async def update_user(db: DbSession, *, user: AuthUser, user_in: UpdateUser) -> RealWorldUser | None:
     results = await db.execute(
         sa.update(RealWorldUser)
         .where(RealWorldUser.id == user.id)

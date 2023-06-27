@@ -28,24 +28,20 @@ async def create_user(
     db: DbSession,
     body: UserBody[NewUser],
 ) -> UserBody[AuthUser]:
-    if not await service.is_unique(
-        db, email=body.user.email, username=body.user.username
-    ):
+    if not await service.is_user_unique(db, email=body.user.email, username=body.user.username):
         raise HTTPException(
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             detail={"user": ["user with this email or username already exists"]},
         )
 
-    user = await service.create(db, user_in=body.user)
+    user = await service.create_user(db, user_in=body.user)
     if user is None:
         raise HTTPException(
             HTTPStatus.INTERNAL_SERVER_ERROR,
             detail={"user": ["could not be created"]},
         )
 
-    authenticated_user = AuthUser(
-        **User.from_orm(user).dict(), token=await user.gen_jwt()
-    )
+    authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
     return UserBody(user=authenticated_user)
 
 
@@ -56,7 +52,7 @@ async def create_user(
     response_model=UserBody[AuthUser],
 )
 async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[AuthUser]:
-    user = await service.get_by_field(db, field="email", value=body.user.email)
+    user = await service.get_user_by_field(db, field="email", value=body.user.email)
 
     if user is None or not user.password_matches(body.user.password):
         raise HTTPException(
@@ -64,9 +60,7 @@ async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[Auth
             detail={"user": ["invalid email or password"]},
         )
 
-    authenticated_user = AuthUser(
-        **User.from_orm(user).dict(), token=await user.gen_jwt()
-    )
+    authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
     return UserBody(user=authenticated_user)
 
 
@@ -87,44 +81,33 @@ async def current_user(
 async def update_user(
     db: DbSession,
     body: UserBody[UpdateUser],
-    authenticated_user: AuthUser = Depends(get_current_user),
+    logged_in_user: AuthUser = Depends(get_current_user),
 ) -> UserBody[AuthUser]:
     # All fields being None essentially means these routes are the same
     if all(val is None for val in body.user.dict().values()):
         return await current_user()
 
-    if body.user.email is not None and body.user.email != authenticated_user.email:
-        if (
-            await service.get_by_field(db, field="email", value=body.user.email)
-            is not None
-        ):
+    if body.user.email is not None and body.user.email != logged_in_user.email:
+        if await service.get_user_by_field(db, field="email", value=body.user.email) is not None:
             raise HTTPException(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 detail={"email": ["user with this email already exists"]},
             )
 
-    if (
-        body.user.username is not None
-        and body.user.username != authenticated_user.username
-    ):
-        if (
-            await service.get_by_field(
-                db, field="username", value=authenticated_user.username
-            )
-            is not None
-        ):
+    if body.user.username is not None and body.user.username != logged_in_user.username:
+        if await service.get_user_by_field(db, field="username", value=logged_in_user.username) is not None:
             raise HTTPException(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 detail={"username": ["user with this username already exists"]},
             )
 
-    user = await service.update(db, user=authenticated_user, user_in=body.user)
+    user = await service.update_user(db, user=logged_in_user, user_in=body.user)
     if user is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail={"user": ["not found"]})
 
     return UserBody(
         user=AuthUser(
             **User.from_orm(user).dict(),
-            token=await user.gen_jwt(),
+            token=user.gen_jwt(),
         )
     )

@@ -24,9 +24,6 @@ class User(RealWorldBaseModel):
     bio: str | None = None
     image: HttpUrl | None = None
 
-    class Config:
-        orm_mode = True
-
 
 class AuthUser(User):
     id: UUID4 | None = Field(None, exclude=True)

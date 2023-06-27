@@ -8,4 +8,6 @@ def _snake_to_camel_case(string: str) -> str:
 
 class RealWorldBaseModel(BaseModel):
     class Config:
+        orm_mode = True
         alias_generator = _snake_to_camel_case
+        validate_assignment = True
