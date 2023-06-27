@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 # https://www.realworld.how/docs/specs/backend-specs/endpoints#get-profile
-@router.get("/profiles/{username}", response_model=ProfileBody[Profile])
+@router.get("/profiles/{username}", status_code=HTTPStatus.OK, response_model=ProfileBody[Profile])
 async def get_user_profile(
     db: DbSession, username: str, maybe_current_user: AuthUser | None = Depends(maybe_get_current_user)
 ) -> ProfileBody[Profile]:
@@ -27,7 +27,7 @@ async def get_user_profile(
 
 
 # https://www.realworld.how/docs/specs/backend-specs/endpoints#follow-user
-@router.post("/profiles/{username}/follow", response_model=ProfileBody[Profile])
+@router.post("/profiles/{username}/follow", status_code=HTTPStatus.OK, response_model=ProfileBody[Profile])
 async def follow_user(
     db: DbSession, username: str, current_user: AuthUser = Depends(get_current_user)
 ) -> ProfileBody[Profile]:
@@ -42,7 +42,7 @@ async def follow_user(
 
 
 # https://www.realworld.how/docs/specs/backend-specs/endpoints/#unfollow-user
-@router.delete("/profiles/{username}/follow", response_model=ProfileBody[Profile])
+@router.delete("/profiles/{username}/follow", status_code=HTTPStatus.OK, response_model=ProfileBody[Profile])
 async def unfollow_user(
     db: DbSession, username: str, current_user: AuthUser = Depends(get_current_user)
 ) -> ProfileBody[Profile]:
