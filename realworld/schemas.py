@@ -1,13 +1,10 @@
 from pydantic import BaseModel
-
-
-def _snake_to_camel_case(string: str) -> str:
-    words = string.split("_")
-    return words[0] + "".join(word.capitalize() for word in words[1:])
+from pydantic.utils import to_lower_camel
 
 
 class RealWorldBaseModel(BaseModel):
     class Config:
         orm_mode = True
-        alias_generator = _snake_to_camel_case
+        alias_generator = to_lower_camel
         validate_assignment = True
+        allow_population_by_field_name = True

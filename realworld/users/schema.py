@@ -26,7 +26,7 @@ class User(RealWorldBaseModel):
 
 
 class AuthUser(User):
-    id: UUID4 | None = Field(None, exclude=True)
+    user_id: UUID4 | None = Field(exclude=True)
     token: str | None = None
 
 

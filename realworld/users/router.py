@@ -1,10 +1,12 @@
 from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from realworld.database.core import DbSession
 from realworld.users import service
 from realworld.users.dependencies import get_current_user
+from realworld.users.model import RealWorldUser
 
 from .schema import (
     AuthUser,
@@ -19,27 +21,18 @@ router = APIRouter()
 
 
 # https://realworld-docs.netlify.app/docs/specs/backend-specs/endpoints#registration
-@router.post(
-    "/users",
-    status_code=HTTPStatus.CREATED,
-    response_model=UserBody[AuthUser],
-)
+@router.post("/users", status_code=HTTPStatus.CREATED, response_model=UserBody[AuthUser])
 async def create_user(
     db: DbSession,
     body: UserBody[NewUser],
 ) -> UserBody[AuthUser]:
-    if not await service.is_user_unique(db, email=body.user.email, username=body.user.username):
+    try:
+        user = await service.create_user(db, user_in=body.user)
+    except IntegrityError:
         raise HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail={"user": ["user with this email or username already exists"]},
-        )
-
-    user = await service.create_user(db, user_in=body.user)
-    if user is None:
-        raise HTTPException(
-            HTTPStatus.INTERNAL_SERVER_ERROR,
-            detail={"user": ["could not be created"]},
-        )
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail={"user": ["a user with this email or username already exists"]},
+        ) from None
 
     authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
     return UserBody(user=authenticated_user)
@@ -52,7 +45,7 @@ async def create_user(
     response_model=UserBody[AuthUser],
 )
 async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[AuthUser]:
-    user = await service.get_user_by_field(db, field="email", value=body.user.email)
+    user = await RealWorldUser.by_email(db, body.user.email)
 
     if user is None or not user.password_matches(body.user.password):
         raise HTTPException(
@@ -88,22 +81,20 @@ async def update_user(
         return await current_user()
 
     if body.user.email is not None and body.user.email != logged_in_user.email:
-        if await service.get_user_by_field(db, field="email", value=body.user.email) is not None:
+        if await RealWorldUser.by_email(db, body.user.email) is not None:
             raise HTTPException(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 detail={"email": ["user with this email already exists"]},
             )
 
     if body.user.username is not None and body.user.username != logged_in_user.username:
-        if await service.get_user_by_field(db, field="username", value=logged_in_user.username) is not None:
+        if await RealWorldUser.by_username(db, body.user.username) is not None:
             raise HTTPException(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 detail={"username": ["user with this username already exists"]},
             )
 
     user = await service.update_user(db, user=logged_in_user, user_in=body.user)
-    if user is None:
-        raise HTTPException(HTTPStatus.NOT_FOUND, detail={"user": ["not found"]})
 
     return UserBody(
         user=AuthUser(
