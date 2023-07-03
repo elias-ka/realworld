@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
@@ -26,7 +26,8 @@ sessionmaker = async_sessionmaker(
 
 
 class Base(AsyncAttrs, DeclarativeBase):
-    pass
+    def dict(self) -> dict[Any, Any]:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
