@@ -3,6 +3,7 @@ from typing import Generic, TypeVar
 from pydantic.generics import GenericModel
 
 from realworld.schemas import RealWorldBaseModel
+from realworld.users.schema import User
 
 T = TypeVar("T", bound="RealWorldBaseModel")
 
@@ -17,3 +18,12 @@ class Profile(RealWorldBaseModel):
     bio: str
     image: str | None = None
     following: bool
+
+    @staticmethod
+    def from_user(user: User, following: bool = False) -> "Profile":
+        return Profile(
+            username=user.username,
+            bio=user.bio or "",
+            image=user.image,
+            following=following,
+        )

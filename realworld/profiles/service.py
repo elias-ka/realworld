@@ -1,4 +1,6 @@
-import sqlalchemy as sa
+import uuid
+
+from sqlalchemy import delete, exists, select
 from sqlalchemy.dialects.postgresql import insert as psql_insert
 
 from realworld.database.core import DbSession
@@ -8,19 +10,22 @@ from realworld.users.model import RealWorldUser
 from realworld.users.schema import AuthUser
 
 
-async def get_profile(db: DbSession, *, username: str, maybe_current_user: AuthUser | None) -> Profile | None:
-    user = await db.scalar(sa.select(RealWorldUser).filter(RealWorldUser.username == username))
+async def get_profile(db: DbSession, *, identifier: uuid.UUID | str, current_user: AuthUser | None) -> Profile | None:
+    if isinstance(identifier, str):
+        user = await RealWorldUser.by_username(db, identifier)
+    else:
+        user = await RealWorldUser.by_id(db, identifier)
 
     if user is None:
         return None
 
     following: bool | None = None
-    if maybe_current_user is not None:
+    if current_user is not None:
         following = await db.scalar(
-            sa.select(
-                sa.exists()
+            select(
+                exists()
                 .where(Follow.followed_user_id == user.id)
-                .where(Follow.following_user_id == maybe_current_user.id)
+                .where(Follow.following_user_id == current_user.user_id)
             )
         )
 
@@ -28,38 +33,46 @@ async def get_profile(db: DbSession, *, username: str, maybe_current_user: AuthU
         username=user.username,
         bio=user.bio,
         image=user.image,
-        following=following if following is not None else False,
+        following=following or False,
     )
 
 
 async def follow_user(db: DbSession, *, username: str, current_user: AuthUser) -> Profile | None:
-    user = await db.scalar(sa.select(RealWorldUser).filter(RealWorldUser.username == username))
-
-    if user is None:
-        return None
-
-    insert_stmt = (
-        psql_insert(Follow)
-        .values(
-            followed_user_id=user.id,
-            following_user_id=current_user.id,
-        )
-        .on_conflict_do_nothing()
-    )
-
-    await db.execute(insert_stmt)
-
-    return await get_profile(db, username=username, maybe_current_user=current_user)
-
-
-async def unfollow_user(db: DbSession, *, username: str, current_user: AuthUser) -> Profile | None:
-    user = await db.scalar(sa.select(RealWorldUser).filter(RealWorldUser.username == username))
-
-    if user is None:
+    if (user := await RealWorldUser.by_username(db, username)) is None:
         return None
 
     await db.execute(
-        sa.delete(Follow).where(Follow.followed_user_id == user.id).where(Follow.following_user_id == current_user.id)
+        psql_insert(Follow)
+        .values(
+            followed_user_id=user.id,
+            following_user_id=current_user.user_id,
+        )
+        .on_conflict_do_nothing()
+    )
+    await db.commit()
+
+    return await get_profile(db, identifier=user.id, current_user=current_user)
+
+
+async def unfollow_user(db: DbSession, *, username: str, current_user: AuthUser) -> Profile | None:
+    if (user := await RealWorldUser.by_username(db, username)) is None:
+        return None
+
+    await db.execute(
+        delete(Follow).where(Follow.followed_user_id == user.id).where(Follow.following_user_id == current_user.user_id)
     )
 
-    return await get_profile(db, username=username, maybe_current_user=current_user)
+    return await get_profile(db, identifier=user.id, current_user=current_user)
+
+
+async def is_following(db: DbSession, *, username: str, current_user: AuthUser) -> bool:
+    if (user := await RealWorldUser.by_username(db, username)) is None:
+        return False
+
+    following = await db.scalar(
+        select(
+            exists().where(Follow.followed_user_id == user.id).where(Follow.following_user_id == current_user.user_id)
+        )
+    )
+
+    return following or False

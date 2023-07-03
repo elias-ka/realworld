@@ -16,7 +16,7 @@ router = APIRouter()
 async def get_user_profile(
     db: DbSession, username: str, maybe_current_user: AuthUser | None = Depends(maybe_get_current_user)
 ) -> ProfileBody[Profile]:
-    profile = await service.get_profile(db, username=username, maybe_current_user=maybe_current_user)
+    profile = await service.get_profile(db, identifier=username, current_user=maybe_current_user)
     if profile is None:
         raise HTTPException(
             HTTPStatus.NOT_FOUND,
