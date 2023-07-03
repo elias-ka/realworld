@@ -1,5 +1,6 @@
 from pydantic import SecretStr
 from starlette.config import Config
+from starlette.datastructures import CommaSeparatedStrings
 
 config = Config(".env")
 
@@ -17,4 +18,9 @@ SQLALCHEMY_DATABASE_URI = f"postgresql+asyncpg://{_DATABASE_CREDENTIAL_USER}:{_D
 
 JWT_EXP_MINUTES = config("JWT_EXP_MINUTES", cast=int, default=60 * 24)
 JWT_SECRET = config("JWT_SECRET", cast=SecretStr)
-JWT_ALG = config("JWT_ALG", cast=str, default="RS256")
+JWT_ALG = "RS256"
+
+CORS_ORIGIN_ALLOW_ALL = config("CORS_ORIGIN_ALLOW_ALL", cast=bool, default=True)
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=CommaSeparatedStrings, default=CommaSeparatedStrings(["*"]))
+CORS_ALLOW_HEADERS = config("CORS_ALLOW_HEADERS", cast=CommaSeparatedStrings, default=CommaSeparatedStrings(["*"]))
+CORS_ALLOW_METHODS = config("CORS_ALLOW_METHODS", cast=CommaSeparatedStrings, default=CommaSeparatedStrings(["*"]))
