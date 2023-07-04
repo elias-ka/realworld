@@ -12,7 +12,7 @@ from realworld.users.schema import AuthUser, User
 
 def _extract_token(authorization: str, required: bool = True) -> str:
     token_name, token = authorization.split()
-    if token_name.lower() != "token":
+    if token_name.lower() != "token" and required:
         raise MissingAuthorizationHeaderError()
 
     return token
