@@ -1,11 +1,17 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.exc import IntegrityError
 
 from realworld.database.core import DbSession
 from realworld.users import service
 from realworld.users.dependencies import get_current_user
+from realworld.users.exceptions import (
+    EmailAlreadyExistsError,
+    InvalidEmailOrPasswordError,
+    UserAlreadyExistsError,
+    UsernameAlreadyExistsError,
+)
 from realworld.users.model import RealWorldUser
 
 from .schema import (
@@ -29,10 +35,7 @@ async def create_user(
     try:
         user = await service.create_user(db, user_in=body.user)
     except IntegrityError:
-        raise HTTPException(
-            HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail={"user": ["a user with this email or username already exists"]},
-        ) from None
+        raise UserAlreadyExistsError() from None
 
     authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
     return UserBody(user=authenticated_user)
@@ -48,10 +51,7 @@ async def log_in_user(db: DbSession, body: UserBody[LoginUser]) -> UserBody[Auth
     user = await RealWorldUser.by_email(db, body.user.email)
 
     if user is None or not user.password_matches(body.user.password):
-        raise HTTPException(
-            HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail={"user": ["invalid email or password"]},
-        )
+        raise InvalidEmailOrPasswordError()
 
     authenticated_user = AuthUser(**User.from_orm(user).dict(), token=user.gen_jwt())
     return UserBody(user=authenticated_user)
@@ -82,17 +82,11 @@ async def update_user(
 
     if body.user.email is not None and body.user.email != logged_in_user.email:
         if await RealWorldUser.by_email(db, body.user.email) is not None:
-            raise HTTPException(
-                HTTPStatus.UNPROCESSABLE_ENTITY,
-                detail={"email": ["user with this email already exists"]},
-            )
+            raise EmailAlreadyExistsError()
 
     if body.user.username is not None and body.user.username != logged_in_user.username:
         if await RealWorldUser.by_username(db, body.user.username) is not None:
-            raise HTTPException(
-                HTTPStatus.UNPROCESSABLE_ENTITY,
-                detail={"username": ["user with this username already exists"]},
-            )
+            raise UsernameAlreadyExistsError()
 
     user = await service.update_user(db, user=logged_in_user, user_in=body.user)
 

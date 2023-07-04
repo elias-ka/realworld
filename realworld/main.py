@@ -15,8 +15,8 @@ app = FastAPI(debug=config.LOG_LEVEL == "DEBUG", openapi_url=None, docs_url=None
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ALLOWED_ORIGINS if not config.CORS_ORIGIN_ALLOW_ALL else ["*"],
-    allow_headers=config.CORS_ALLOW_HEADERS if not config.CORS_ORIGIN_ALLOW_ALL else ["*"],
-    allow_methods=config.CORS_ALLOW_METHODS if not config.CORS_ORIGIN_ALLOW_ALL else ["*"],
+    allow_headers=config.CORS_ALLOWED_HEADERS if not config.CORS_ORIGIN_ALLOW_ALL else ["*"],
+    allow_methods=config.CORS_ALLOWED_METHODS if not config.CORS_ORIGIN_ALLOW_ALL else ["*"],
 )
 app.include_router(api_router, prefix="/api")
 

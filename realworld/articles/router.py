@@ -1,10 +1,17 @@
 import logging
-from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.exc import IntegrityError
 
+from realworld.articles.exceptions import (
+    ArticleCommentNotFoundError,
+    ArticleCouldNotBeUpdatedError,
+    ArticleDeleteNotPermittedError,
+    ArticleNotFoundError,
+    ArticleTitleAlreadyExistsError,
+    AuthorNotFoundError,
+)
 from realworld.articles.model import RealWorldArticle
 from realworld.database.core import DbSession
 from realworld.profiles import service as profile_service
@@ -56,9 +63,7 @@ async def create_article(
     try:
         article = await service.create_article(db, article_in=body.article, user=current_user)
     except IntegrityError:
-        raise HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail={"article": "an article with this title already exists"}
-        ) from None
+        raise ArticleTitleAlreadyExistsError() from None
 
     return SingleArticleBody(
         article=Article(
@@ -78,10 +83,10 @@ async def get_article(
     current_user: Annotated[AuthUser, Depends(maybe_get_current_user)],
 ) -> SingleArticleBody[Article]:
     if (article := await RealWorldArticle.by_slug(db, slug)) is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"article": "article not found"})
+        raise ArticleNotFoundError()
 
     if (author := await profile_service.get_profile(db, identifier=article.user_id, current_user=current_user)) is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"author": "author not found"})
+        raise AuthorNotFoundError()
 
     favorited = (
         await service.is_article_favorited_by_user(db, article_id=article.id, user=current_user)
@@ -108,19 +113,15 @@ async def update_article(
     current_user: AuthUser = Depends(get_current_user),
 ) -> SingleArticleBody[Article]:
     if (_ := await RealWorldArticle.by_slug(db, slug)) is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"article": "article not found"})
+        raise ArticleNotFoundError()
 
     try:
         article = await service.update_article(db, slug=slug, article_in=body.article, user=current_user)
     except IntegrityError:
-        raise HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail={"article": "an article with this title already exists"}
-        ) from None
+        raise ArticleTitleAlreadyExistsError() from None
 
     if article is None:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail={"article": "could not update article"}
-        )
+        raise ArticleCouldNotBeUpdatedError()
 
     return SingleArticleBody(
         article=Article(
@@ -142,10 +143,7 @@ async def delete_article(
     try:
         await service.delete_article(db, slug=slug, user=current_user)
     except IntegrityError:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail={"article": "delete operation not permitted or the article does not exist"},
-        ) from None
+        raise ArticleDeleteNotPermittedError() from None
 
 
 # https://www.realworld.how/docs/specs/backend-specs/endpoints/#list-articles
@@ -168,7 +166,7 @@ async def favorite_article(
 ) -> SingleArticleBody[Article]:
     article = await service.favorite_article(db, slug=slug, current_user=current_user)
     if article is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"article": "not found"})
+        raise ArticleNotFoundError()
 
     return SingleArticleBody(article=article)
 
@@ -182,7 +180,7 @@ async def unfavorite_article(
 ) -> SingleArticleBody[Article]:
     article = await service.unfavorite_article(db, slug=slug, current_user=current_user)
     if article is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"article": "not found"})
+        raise ArticleNotFoundError()
 
     return SingleArticleBody(article=article)
 
@@ -203,7 +201,7 @@ async def add_article_comment(
 ) -> SingleCommentBody[Comment]:
     comment = await service.add_artcicle_comment(db, slug=slug, body=body.comment.body, current_user=current_user)
     if comment is None:
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail={"article": "not found"})
+        raise ArticleNotFoundError()
 
     return SingleCommentBody(comment=Comment(**comment.dict(), author=Profile.from_user(current_user)))
 
@@ -217,10 +215,7 @@ async def delete_article_comment(
     current_user: AuthUser = Depends(get_current_user),
 ) -> None:
     if not await service.delete_article_comment(db, slug=slug, comment_id=comment_id, current_user=current_user):
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail={"comment": "not found"},
-        )
+        raise ArticleCommentNotFoundError()
 
 
 # https://www.realworld.how/docs/specs/backend-specs/endpoints/#get-comments-from-an-article

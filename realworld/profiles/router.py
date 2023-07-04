@@ -1,9 +1,10 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from realworld.database.core import DbSession
 from realworld.profiles import service
+from realworld.profiles.exceptions import ProfileNotFoundError
 from realworld.profiles.schema import Profile, ProfileBody
 from realworld.users.dependencies import get_current_user, maybe_get_current_user
 from realworld.users.schema import AuthUser
@@ -18,10 +19,7 @@ async def get_user_profile(
 ) -> ProfileBody[Profile]:
     profile = await service.get_profile(db, identifier=username, current_user=maybe_current_user)
     if profile is None:
-        raise HTTPException(
-            HTTPStatus.NOT_FOUND,
-            detail={"profile": ["not found"]},
-        )
+        raise ProfileNotFoundError()
 
     return ProfileBody(profile=profile)
 
@@ -33,10 +31,7 @@ async def follow_user(
 ) -> ProfileBody[Profile]:
     profile = await service.follow_user(db, username=username, current_user=current_user)
     if profile is None:
-        raise HTTPException(
-            HTTPStatus.NOT_FOUND,
-            detail={"profile": ["not found"]},
-        )
+        raise ProfileNotFoundError()
 
     return ProfileBody(profile=profile)
 
@@ -48,9 +43,6 @@ async def unfollow_user(
 ) -> ProfileBody[Profile]:
     profile = await service.unfollow_user(db, username=username, current_user=current_user)
     if profile is None:
-        raise HTTPException(
-            HTTPStatus.NOT_FOUND,
-            detail={"profile": ["not found"]},
-        )
+        raise ProfileNotFoundError()
 
     return ProfileBody(profile=profile)

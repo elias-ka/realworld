@@ -7,6 +7,7 @@ import jwt
 from pydantic import BaseModel
 
 from realworld import config
+from realworld.users.exceptions import CredentialValidationError
 
 
 class JwtClaims(BaseModel):
@@ -19,7 +20,7 @@ class JwtClaims(BaseModel):
         try:
             return uuid.UUID(self.sub)
         except ValueError:
-            raise ValueError("invalid user id") from None
+            raise CredentialValidationError() from None
 
     def encode(self) -> str:
         return jwt.encode(self.dict(), config.JWT_SECRET.get_secret_value(), config.JWT_ALG)
@@ -29,4 +30,4 @@ class JwtClaims(BaseModel):
         try:
             return cls(**jwt.decode(token, config.JWT_SECRET.get_secret_value(), algorithms=[config.JWT_ALG]))
         except jwt.DecodeError:
-            raise ValueError("invalid token") from None
+            raise CredentialValidationError() from None
